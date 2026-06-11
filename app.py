@@ -40,13 +40,44 @@ def summarize_document(content):
             }
         ]
     )
+
+def step1_search(topic: str) -> str:
+    response = client.chat.completions.create(
+        model="groq/compound-mini",
+        messages=[
+            {"role": "system", "content": "You are a research assistant. Search the web and return raw findings only. No formatting, just facts and sources."},
+            {"role": "user", "content": f"Search for current information on: {topic}"}
+        ]
+    )
+    return response.choices[0].message.content
+
+def step2_summarize(raw_research: str) -> str:
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": "You are an analyst. Summarize the key facts from the research provided. Be concise and accurate."},
+            {"role": "user", "content": f"Summarize these research findings:\n\n{raw_research}"}
+        ]
+    )
+    return response.choices[0].message.content
+
+def step3_format_report(topic: str, summary: str) -> str:
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": "You are a professional report writer for a cybersecurity consulting firm. Format the input into a clean report with these sections: Executive Summary, Key Findings, Recommendations, and Sources."},
+            {"role": "user", "content": f"Topic: {topic}\n\nResearch Summary:\n{summary}"}
+        ]
+    )
+    return response.choices[0].message.content
+
     return response.choices[0].message.content
 
 # ── UI ──────────────────────────────────────────────────
 st.title("Kingswill Compliance Assistant")
 st.caption("Powered by AI — for small healthcare and therapy practices")
 
-tab1, tab2 = st.tabs(["Ask a Question", "Analyze a Document"])
+tab1, tab2, tab3 = st.tabs(["Ask a Question", "Analyze a Document", "Research Report"])
 
 # Tab 1 — Q&A Agent
 with tab1:
@@ -72,3 +103,19 @@ with tab2:
             st.markdown(result)
         else:
             st.warning("Please upload a file first.")
+
+# Tab 3 — Multi-step Research Agent
+with tab3:
+    st.subheader("Generate a Research Report")
+    topic = st.text_input("Enter a research topic:")
+    if st.button("Generate Report", key="research"):
+        if topic:
+            with st.spinner("Step 1: Searching the web..."):
+                raw = step1_search(topic)
+            with st.spinner("Step 2: Summarizing findings..."):
+                summary = step2_summarize(raw)
+            with st.spinner("Step 3: Formatting report..."):
+                report = step3_format_report(topic, summary)
+            st.markdown(report)
+        else:
+            st.warning("Please enter a topic.")
